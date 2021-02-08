@@ -12,11 +12,21 @@ AutoIdMaker.prototype.initConfig = function(config) {
   this.config = config
   if(!this.config) {
     this.config = {
-      componentElemSelector: '.a-component',
+      componentElemSelector: '.a-component-level-keyword',
       targetElemsConfig: {
-        'button': {
-          typeName: 'btn'
+        /*
+        '.selector': {
+          typeName: 'humanFriendlyName',
+          retriever: (el) => {
+            // a function to get keyword from target element
+            return el.textContent.replace(/\s+/g, '')
+          },
+          // optional|define key parent node selector of this target element
+          // 可选，定义该目标控件元素的关键祖元素，以从祖元素链上获取到关键字拼接
+          // 为定义时使用config.componentElemSelector
+          keyParentsNodeSelector: '.a-component'
         }
+        */
       }
     }
   }
@@ -31,12 +41,15 @@ AutoIdMaker.prototype.addIdAction = function (el) {
   for (const selector in config) {
     if (Object.hasOwnProperty.call(config, selector)) {
       const cfg = config[selector];
-      this.addIdForEl(el, selector, cfg.typeName, cfg.retriever)
+      if(!cfg.keyParentsNodeSelector) {
+        cfg.keyParentsNodeSelector = this.config.componentElemSelector
+      }
+      this.addIdForEl(el, selector, cfg.typeName, cfg.retriever, cfg.keyParentsNodeSelector)
     }
   }
 }
 
-AutoIdMaker.prototype.addIdForEl = function(parentElem, selector, typeName = '', retriever, keyParentsNodeSelector = '.a-component') {
+AutoIdMaker.prototype.addIdForEl = function(parentElem, selector, typeName = '', retriever, keyParentsNodeSelector) {
   let keywordRetriever = retriever
   if(!keywordRetriever) {
     keywordRetriever = (el) => {
@@ -60,11 +73,17 @@ AutoIdMaker.prototype.addIdForEl = function(parentElem, selector, typeName = '',
         }).join('-')
         if(concatId) {
           let targetId = concatId + '-' + typeName + '-' + keywordRetriever(el)
-          if(idCache[targetId] !== undefined) {
-            idCache[targetId].push(el)
-            targetId += idCache[targetId].length
+          if(idCache[targetId]) {
+            idCache[targetId].elements.add(el)
+            idCache[targetId].count += 1
+            targetId += idCache[targetId].count
           } else {
-            idCache[targetId] = [el]
+            idCache[targetId] = {
+              count: 0,
+              elements: new WeakSet()
+            }
+            idCache[targetId].elements.add(el)
+            idCache[targetId].count += 1
           }
           el.setAttribute('id', targetId)
         }
